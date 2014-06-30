@@ -1,0 +1,4 @@
+A Monte Carlo Markov Chain to simulate the arrival times.  
+
+The algorithm and results using data from the U.C. Davis Medical Center were
+presented in Antognini, Antognini, & Khatri (2014).
