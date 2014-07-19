@@ -91,6 +91,7 @@ def model_ors(n_day_oprooms,
   day_to_min = 1440 # Number of minutes in a day
   hour_to_min = 60 # Number of minutes in an hour
 
+  # Typechecking
   if type(n_day_oprooms) is not int:
     raise TypeError('model_ors(): n_day_oprooms must be int!')
   elif n_day_oprooms <= 0:
@@ -121,6 +122,12 @@ def model_ors(n_day_oprooms,
     if n_night_oprooms is not None:
       if type(n_night_oprooms) is not int:
         raise TypeError('model_ors(): n_night_oprooms must be int!')
+      elif n_night_oprooms > n_day_oprooms:
+        raise ValueError(\
+        'model_ors(): n_night_oprooms must be less than n_day_oprooms!')
+      elif n_night_oprooms < 0:
+        raise ValueError(\
+        'model_ors(): n_night_oprooms must be non-negative!')
     if type(night_length) not in (int, float, long):
       raise TypeError('model_ors(): night_length must be a number!')
     elif night_length < 0:
