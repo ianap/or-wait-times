@@ -18,33 +18,6 @@
 #   -- The time the patient spent in surgery
 #
 
-# 
-# Important data structures in this program:
-#
-#   emergent_queue: This is a list of patients in the emergency queue.  Each
-#     patient is recorded in the list by the time that the patient arrived.
-#     The list is sorted in order of increasing time.  Thus the first
-#     patient in the queue is the patient who has been waiting the longest,
-#     and is the first patient who will be removed from the queue when an
-#     operating room frees up.
-#
-#   urgent1_queue, urgent2_queue, etc.: Identical to emergent_queue, except
-#     for the other classes of patients.  These patients are served after
-#     the emergent patients.
-#
-#   operating_rooms: This is a list of all operating rooms currently in use.
-#     Each operating room in use is recorded in this list by the time when
-#     the operating room will be available again. 
-#
-#   utilization_frac: This is a list used to calculate how often the
-#     operating rooms are used.  The first element of this list is the total
-#     amount of time that exactly zero operating rooms have been in use,
-#     the second element is the total amount of time that exactly one
-#     operating room was in use, etc.  The utilization fraction is then
-#     calculated by taking these numbers and dividing by the total length of
-#     the experiment. 
-#
-
 # Import the necessary Python packages so we have all the functions we need.
 import random
 import numpy
@@ -52,27 +25,111 @@ import datetime
 import sys
 
 def model_ors(n_day_oprooms, 
-              n_classes=4, 
+              n_classes, 
+              distribution_parameters,
               n_night_oprooms=None, 
-              night_length=8):
-  '''
+              night_length=8,
+              converge_time=1e5):
+  '''Run a Monte Carlo simulation of patients moving through a hospital's
+  operating room system. 
+
+  Parameters:
+    n_day_oprooms: int
+      The number of operating rooms during the day
+
+    n_classes: int, optional
+      The number of patient classes
+
+    distribution_parameters: list or tuple
+      A list or tuple describing the probability distribution of arrival
+      times and surgery times.  This parameter must be as long as the number
+      of classes (n_classes).  Each element must consist of a list or tuple
+      of three elements.  The first describes the mean arrival rate, the
+      second describes the mean surgery length, and the third describes the
+      standard deviation of the surgery length.
+
+    n_night_oprooms: int, optional
+      The number of operating rooms during the night.  By default this is
+      the same as the number of operating rooms during the day.
+
+    night_length: float
+      The number of hours per day that only night operating rooms are used.
+    
+    converge_time: float, optional
+      The number of seconds to discard at the beginning of the program to
+      let the program converge.
+      
+  Important data structures in this program:
+    emergent_queue: This is a list of patients in the emergency queue.  Each
+      patient is recorded in the list by the time that the patient arrived.
+      The list is sorted in order of increasing time.  Thus the first
+      patient in the queue is the patient who has been waiting the longest,
+      and is the first patient who will be removed from the queue when an
+      operating room frees up.
+ 
+    urgent1_queue, urgent2_queue, etc.: Identical to emergent_queue, except
+      for the other classes of patients.  These patients are served after
+      the emergent patients.
+ 
+    operating_rooms: This is a list of all operating rooms currently in use.
+      Each operating room in use is recorded in this list by the time when
+      the operating room will be available again. 
+ 
+    utilization_frac: This is a list used to calculate how often the
+      operating rooms are used.  The first element of this list is the total
+      amount of time that exactly zero operating rooms have been in use,
+      the second element is the total amount of time that exactly one
+      operating room was in use, etc.  The utilization fraction is then
+      calculated by taking these numbers and dividing by the total length of
+      the experiment. 
   '''
 
   if n_night_oprooms is None:
     n_night_oprooms = n_day_oprooms
 
-# A few constants
-day_to_min = 1440 # Number of minutes in a day
-night_hrs = 8 # Number of hours when the smaller number of ORs is used.
-hour_to_min = 60 # Number of minutes in an hour
+  # A few constants
+  day_to_min = 1440 # Number of minutes in a day
+  hour_to_min = 60 # Number of minutes in an hour
 
-# Check to make sure that the user has supplied the program with the number
-# of operating rooms during the day and the number of operating rooms during
-# the night.
-if len(sys.argv) != 3:
-  print "usage: mc.py n_day_oprooms n_night_oprooms"
-  sys.exit(1)
-
+  if type(n_day_oprooms) is not int:
+    raise TypeError('model_ors(): n_day_oprooms must be int!')
+  elif n_day_oprooms <= 0:
+    raise ValueError('model_ors(): n_day_oprooms must be positive!')
+  if type(n_classes) is not int:
+    raise TypeError('model_ors(): n_classes must be int!')
+  elif n_classes <= 0:
+    raise ValueError('model_ors(): n_classes must be positive!')
+  if type(distribution_parameters) not in (list, tuple):
+    raise TypeError('distribution_parameters must be tuple!')
+  if len(distribution_parameters) != n_classes:
+    raise ValueError(\
+    'model_ors(): length of distribution_parameters not equal to n_classes!')
+  for elem in distirbution_parameters:
+    if type(elem) not in (list, tuple):
+      raise TypeError('model_ors(): ' + str(elem) + 
+      ' must be list or tuple')
+    if len(elem) != 3:
+      raise ValueError('model_ors(): ' + str(elem) + 
+      ' must have exactly three elements!')
+    for item in elem:
+      if type(item) not in (int, float, long):
+        raise TypeError('model_ors(): ' + str(item) + ' in ' + str(elem)
+        + ' is not a number!')
+      elif item < 0:
+        raise ValueError('model_ors(): ' + str(item) + ' in ' + str(elem)
+        + ' must be positive!')
+    if n_night_oprooms is not None:
+      if type(n_night_oprooms) is not int:
+        raise TypeError('model_ors(): n_night_oprooms must be int!')
+    if type(night_length) not in (int, float, long):
+      raise TypeError('model_ors(): night_length must be a number!')
+    elif night_length < 0:
+      raise ValueError('model_ors(): night_length must be non-negative!')
+    if type(converge_time) not in (int, float, long):
+      raise TypeError('model_ors(): converge_time must be a number!')
+    elif converge_time < 0:
+      raise ValueError('model_ors(): converge_time must be positive!')
+        
 # These lines read in the number of operating rooms that the user has
 # supplied.
 n_day_oprooms = int(sys.argv[1])
