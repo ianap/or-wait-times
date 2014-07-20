@@ -1,24 +1,5 @@
 #! /usr/bin/env python
 
-#
-# mc
-#
-# Perform a Monte Carlo simulation of operating room waiting times
-#
-# Joe Antognini
-# Tue Dec 24 15:01:48 EST 2013
-#
-
-#
-# Program output -- each line of output consists of the following data:
-#   -- Patient class (Emergent, Urgent 1, etc.)
-#   -- The time the patient arrived.
-#   -- Whether the patient arrived during the day or the night.
-#   -- The time the patient had to wait
-#   -- The time the patient spent in surgery
-#
-
-# Import the necessary Python packages so we have all the functions we need.
 import random
 import numpy
 import datetime
@@ -37,6 +18,7 @@ def is_day(time, night_hours=8):
 def model_ors(n_day_oprooms, 
               distribution_parameters,
               n_night_oprooms=None, 
+              min_dayonly_class=3,
               night_length=8,
               converge_time=1e5,
               experiment_length=2e6):
@@ -58,6 +40,9 @@ def model_ors(n_day_oprooms,
     n_night_oprooms: int, optional
       The number of operating rooms during the night.  By default this is
       the same as the number of operating rooms during the day.
+
+    min_dayonly_class: int, optional
+      The lowest class that only enters surgery during the day.
 
     night_length: float
       The number of hours per day that only night operating rooms are used.
