@@ -3,16 +3,6 @@
 import numpy
 import sys
 
-def is_day(time, night_hours=8):
-  '''This function returns True if it is day and False if it is night.  We
-  assume that night lasts eight hours unless the user specifies
-  otherwise.'''
-
-  if time % day_to_min > night_hours * hour_to_min:
-    return True
-  else:
-    return False
-
 def model_ors(n_day_oprooms, 
               distribution_parameters,
               n_night_oprooms=None, 
@@ -97,7 +87,7 @@ def model_ors(n_day_oprooms,
     raise ValueError('model_ors(): n_day_oprooms must be positive!')
   if type(distribution_parameters) not in (list, tuple):
     raise TypeError('distribution_parameters must be tuple!')
-  for elem in distirbution_parameters:
+  for elem in distribution_parameters:
     if type(elem) not in (list, tuple):
       raise TypeError('model_ors(): ' + str(elem) + 
       ' must be list or tuple')
@@ -147,7 +137,7 @@ def model_ors(n_day_oprooms,
   results = []
 
   # Now we start at time 0, and step through minute by minute.
-  for i in range(experiment_length):
+  for i in range(int(experiment_length)):
     # First we see how many patients have arrived this minute.
     n_patients = [numpy.random.poisson(x[0]) for x in
       distribution_parameters]
@@ -162,7 +152,7 @@ def model_ors(n_day_oprooms,
 
     # Change the number of operating rooms based on the time of day.
     # Currently the program is set up to assume that night lasts eight hours.
-    if is_day(time, night_length):
+    if time % day_to_min > night_length * hour_to_min:
       n_oprooms = n_day_oprooms
     else:
       n_oprooms = n_night_oprooms
@@ -182,7 +172,7 @@ def model_ors(n_day_oprooms,
 
         # Print the data about this patient.
         if time > converge_time:
-          if is_day(queues[j][0]):
+          if queues[j][0] % day_to_min > night_length * hour_to_min:
             time_of_day = "day"
           else:
             time_of_day = "night"
