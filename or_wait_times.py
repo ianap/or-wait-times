@@ -1,8 +1,6 @@
 #! /usr/bin/env python
 
-import random
 import numpy
-import datetime
 import sys
 
 def is_day(time, night_hours=8):
@@ -21,7 +19,8 @@ def model_ors(n_day_oprooms,
               min_dayonly_class=3,
               night_length=8,
               converge_time=1e5,
-              experiment_length=2e6):
+              experiment_length=2e6,
+              cleaning_time=60):
   '''Run a Monte Carlo simulation of patients moving through a hospital's
   operating room system. 
 
@@ -54,6 +53,10 @@ def model_ors(n_day_oprooms,
     experiment_length: number, optional
       The number of seconds to run the experiment (in addition to the
       seconds discarded after converge_time)
+
+    cleaning_time: number, optional
+      The number of minutes before and after a surgery that the operating
+      room is unavailable because it is being prepared or cleaned.
       
   Important data structures in this program:
     emergent_queue: This is a list of patients in the emergency queue.  Each
@@ -85,7 +88,7 @@ def model_ors(n_day_oprooms,
 
   # A few constants
   day_to_min = 1440 # Number of minutes in a day
-  hour_to_min = 60 # Number of minutes in an hour
+  hour_to_min = 60  # Number of minutes in an hour
 
   # Typechecking
   if type(n_day_oprooms) is not int:
@@ -129,6 +132,10 @@ def model_ors(n_day_oprooms,
     raise TypeError('model_ors(): experiment_length must be a number!')
   elif experiment_length < 0:
     raise ValueError('model_ors(): experiment_length must be positive!')
+  if type(cleaning_time) not in (int, float, long):
+    raise TypeError('model_ors(): cleaning_time must be a number!')
+  elif cleaning_time < 0:
+    raise ValueError('model_ors(): cleaning_time must be positive!')
       
   n_classes = len(distribution_parameters)
   time = 0
@@ -137,6 +144,7 @@ def model_ors(n_day_oprooms,
   operating_rooms = []
   queues = [[] for i in range(n_classes)]
   utilization_frac = (n_day_oprooms + 1) * [0]
+  results = []
 
   # Now we start at time 0, and step through minute by minute.
   for i in range(experiment_length):
@@ -144,183 +152,92 @@ def model_ors(n_day_oprooms,
     n_patients = [numpy.random.poisson(x[0]) for x in
       distribution_parameters]
 
-  # If any patients have arrived, add them to the queue.
-  for i in range(n_classes):
-    for j in range(n_patients[i]):
-      queues[i].append(time)
+    # If any patients have arrived, add them to the queue.
+    for j in range(n_classes):
+      for k in range(n_patients[j]):
+        queues[j].append(time)
 
-  # Check to see if any operating rooms have opened up this minute.
-  operating_rooms = [x for x in operating_rooms if x != time]
+    # Check to see if any operating rooms have opened up this minute.
+    operating_rooms = [x for x in operating_rooms if x != time]
 
-  # Change the number of operating rooms based on the time of day.
-  # Currently the program is set up to assume that night lasts eight hours.
-  if is_day(time, night_length):
-    n_oprooms = n_day_oprooms
-  else:
-    n_oprooms = n_night_oprooms
+    # Change the number of operating rooms based on the time of day.
+    # Currently the program is set up to assume that night lasts eight hours.
+    if is_day(time, night_length):
+      n_oprooms = n_day_oprooms
+    else:
+      n_oprooms = n_night_oprooms
 
-  for i in range(n_classes):
-    # Check to see if there are any open operating rooms and any patients in
-    # the emergency queue.
-    if len(operating_rooms) < n_oprooms and len(queues[i]) > 0:
-      # If a patient from the emergency queue can be put in an operating room
-      # this minute, calculate the time the patient had to wait.
-      wait_time = time - queues[i][0]
+    for j in range(n_classes):
+      # Check to see if there are any open operating rooms and any patients in
+      # the emergency queue.
+      if len(operating_rooms) < n_oprooms and len(queues[j]) > 0:
+        # If a patient from the emergency queue can be put in an operating room
+        # this minute, calculate the time the patient had to wait.
+        wait_time = time - queues[j][0]
 
-      # Draw the amount of time that the patient has to spend in surgery from
-      # a log-normal distribution.
-      surgery_time = int(round(numpy.random.lognormal(
-        distribution_parameters[i][1], distribution_parameters[i][2])))
+        # Draw the amount of time that the patient has to spend in surgery from
+        # a log-normal distribution.
+        surgery_time = int(round(numpy.random.lognormal(
+          distribution_parameters[j][1], distribution_parameters[j][2])))
 
-      # Print the data about this patient.
-      if time > converge_time:
-        if is_day(emergent_queue[0]):
-          time_of_day = "day"
-        else:
-          time_of_day = "night"
-        print "emergent", emergent_queue[0], time_of_day, wait_time, \
-          surgery_time
+        # Print the data about this patient.
+        if time > converge_time:
+          if is_day(queues[j][0]):
+            time_of_day = "day"
+          else:
+            time_of_day = "night"
+          results.append([j, queues[j][0], time_of_day, wait_time,
+            surgery_time])
 
-      # Because the patient has been put in an operating room, he can be
-      # removed from the emergency queue.
-      emergent_queue.remove(emergent_queue[0])
+        # Because the patient has been put in an operating room, he can be
+        # removed from the emergency queue.
+        queues[j].remove(queues[j][0])
 
-      # 60 minutes is added to the surgery time for clean up.
-      out_time = time + surgery_time + 60 
-      
-      # Lastly, record the time that the operating room will be free in the
-      # operating rooms list. 
-      operating_rooms.append(out_time)
+        # 60 minutes is added to the surgery time for clean up.
+        out_time = time + surgery_time + cleaning_time
+        
+        # Lastly, record the time that the operating room will be free in the
+        # operating rooms list. 
+        operating_rooms.append(out_time)
 
-    if len(operating_rooms) < n_oprooms and len(urgent1_queue) > 0:
-      wait_time = time - urgent1_queue[0]
-      surgery_time = int(round(numpy.random.lognormal(mean_surg_time_urgent1, sigma_surg_time_urgent1)))
-      if time > converge_time:
-        if is_day(urgent1_queue[0]):
-          time_of_day = "day"
-        else:
-          time_of_day = "night"
-        print "urgent1", urgent1_queue[0], time_of_day, wait_time, surgery_time
-    
-      urgent1_queue.remove(urgent1_queue[0])
-    
-
-# These lines read in the number of operating rooms that the user has
-# supplied.
-n_day_oprooms = int(sys.argv[1])
-n_night_oprooms = int(sys.argv[2])
-
-# These numbers describe the observed probabilities of for patient arrival
-# time rates and surgery times.  See the notebook for the derivation of
-# these numbers.
-
-# The arrival time is described approximately by a Poisson distribution
-p_in_emergent = .001607686 # per minute
-p_in_urgent1 = .003232496
-p_in_urgent2 = .002665525
-p_in_urgent3 = .000334855
-p_in_urgent4 = .00
-p_in_AE = .001288052
-
-# The surgery time is described well by a log-normal distribution
-mean_surg_time_emergent = 5.00716
-mean_surg_time_urgent1 = 4.96477
-mean_surg_time_urgent2 = 5.05842
-mean_surg_time_urgent3 = 5.00069
-mean_surg_time_urgent4 = 4.95519
-mean_surg_time_AE = 5.01655
-
-sigma_surg_time_emergent = .583642
-sigma_surg_time_urgent1 = .677607
-sigma_surg_time_urgent2 = .651279
-sigma_surg_time_urgent3 = .570812
-sigma_surg_time_urgent4 = .665382
-sigma_surg_time_AE  = .713405
-
-# We will run the simulation for a little while without printing any data
-# to wait for it to converge.
-converge_time = 1e5
-#experiment_length = int(2.628e6)
-experiment_length = int(2e5)
-
-    # 60 minutes is added to the surgery time for clean up.
-    out_time = time + surgery_time + 60 
-    operating_rooms.append(out_time)
-  
-  if (len(operating_rooms) < n_oprooms and len(urgent2_queue) and
-    is_day(time)) > 0:
-    wait_time = time - urgent2_queue[0]
-    surgery_time = int(round(numpy.random.lognormal(mean_surg_time_urgent2, sigma_surg_time_urgent2)))
     if time > converge_time:
-      if is_day(urgent2_queue[0]):
-        time_of_day = "day"
-      else:
-        time_of_day = "night"
-      print "urgent2", urgent2_queue[0], time_of_day, wait_time, surgery_time
-  
-    urgent2_queue.remove(urgent2_queue[0])
-  
-    # 60 minutes is added to the surgery time for clean up.
-    out_time = time + surgery_time + 60 
-    operating_rooms.append(out_time)
+      utilization_frac[len(operating_rooms)] += 1
+      time += 1
 
-  if (len(operating_rooms) < n_oprooms and len(urgent3_queue) and
-    is_day(time)) > 0:
-    wait_time = time - urgent3_queue[0]
-    surgery_time = int(round(numpy.random.lognormal(mean_surg_time_urgent3, sigma_surg_time_urgent3)))
-    if time > converge_time:
-      if is_day(urgent3_queue[0]):
-        time_of_day = "day"
-      else:
-        time_of_day = "night"
-      print "urgent3", urgent3_queue[0], time_of_day, wait_time, surgery_time
-  
-    urgent3_queue.remove(urgent3_queue[0])
-  
-    # 60 minutes is added to the surgery time for clean up.
-    out_time = time + surgery_time + 60 
-    operating_rooms.append(out_time)
+  for i, elem in enumerate(utilization_frac):
+    utilization_results = [str(i) + '/' + str(n_oprooms), float(elem) / 
+      (experiment_length - converge_time)]
 
-  if (len(operating_rooms) < n_oprooms and len(urgent4_queue) and
-    is_day(time))> 0:
-    wait_time = time - urgent4_queue[0]
-    surgery_time = int(round(numpy.random.lognormal(mean_surg_time_urgent4, sigma_surg_time_urgent4)))
-    if time > converge_time:
-      if is_day(urgent4_queue[0]):
-        time_of_day = "day"
-      else:
-        time_of_day = "night"
-      print "urgent4", urgent4_queue[0], time_of_day, wait_time, surgery_time
-  
-    urgent4_queue.remove(urgent4_queue[0])
-  
-    # 60 minutes is added to the surgery time for clean up.
-    out_time = time + surgery_time + 60 
-    operating_rooms.append(out_time)
-  
-  if (len(operating_rooms) < n_oprooms and len(AE_queue) and is_day(time)) > 0:
-    wait_time = time - AE_queue[0]
-    surgery_time = int(round(numpy.random.lognormal(mean_surg_time_AE, sigma_surg_time_AE)))
-    if time > converge_time:
-      if is_day(AE_queue[0]):
-        time_of_day = "day"
-      else:
-        time_of_day = "night"
-      print "AE", AE_queue[0], time_of_day, wait_time, surgery_time
-  
-    AE_queue.remove(AE_queue[0])
-  
-    # 60 minutes is added to the surgery time for clean up.
-    out_time = time + surgery_time + 60 
-    operating_rooms.append(out_time)
+  return (results, utilization_results)
 
-  if time > converge_time:
-    utilization_frac[len(operating_rooms)] += 1
-  time += 1
+if __name__ == '__main__':
+  if len(sys.argv) != 2:
+    print "usage: or_wait_times.py n_oprooms"
+    sys.exit(1)
 
-i = 0
-for elem in utilization_frac:
-  print >> sys.stderr, i, "/", n_oprooms, float(elem) / (experiment_length - converge_time)
-  i += 1
+  # These lines read in the number of operating rooms that the user has
+  # supplied.
+  N_DAY_OPROOMS = int(sys.argv[1])
 
-# P.S. Valerie says hi!
+  # These numbers describe the observed probabilities of for patient arrival
+  # time rates and surgery times.  See the notebook for the derivation of
+  # these numbers.
+  DISTRIBUTION_PARAMETERS = ((.001607686, 5.00716, .583642),
+                             (.003232496, 4.96477, .677607),
+                             (.002665525, 5.05842, .651279),
+                             (.000334855, 5.00069, .570812),
+                             (.00,        4.95519, .665382),
+                             (.001288052, 5.01655, .713405))
+
+  RESULTS, UTILIZATION_RESULTS = model_ors(N_DAY_OPROOMS,
+    DISTRIBUTION_PARAMETERS)
+
+  for elem in RESULTS:
+    for item in elem:
+      print item,
+    print
+
+  for elem in UTILIZATION_RESULTS:
+    for item in elem:
+      print >> sys.stderr, item
+    print
