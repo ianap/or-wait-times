@@ -194,9 +194,10 @@ def model_ors(n_day_oprooms,
       utilization_frac[len(operating_rooms)] += 1
       time += 1
 
+  utilization_results = []
   for i, elem in enumerate(utilization_frac):
-    utilization_results = [str(i) + '/' + str(n_oprooms), float(elem) / 
-      (experiment_length - converge_time)]
+    utilization_results.append([str(i) + '/' + str(n_oprooms), float(elem) / 
+      (experiment_length - converge_time)])
 
   return (results, utilization_results)
 
@@ -220,7 +221,7 @@ if __name__ == '__main__':
                              (.001288052, 5.01655, .713405))
 
   RESULTS, UTILIZATION_RESULTS = model_ors(N_DAY_OPROOMS,
-    DISTRIBUTION_PARAMETERS)
+    DISTRIBUTION_PARAMETERS, experiment_length=2e5)
 
   for elem in RESULTS:
     for item in elem:
