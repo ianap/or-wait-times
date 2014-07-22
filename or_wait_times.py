@@ -80,7 +80,10 @@ def model_ors(n_day_oprooms,
   day_to_min = 1440 # Number of minutes in a day
   hour_to_min = 60  # Number of minutes in an hour
 
-  # Typechecking
+  ###
+  ### Typechecking
+  ###
+
   if type(n_day_oprooms) is not int:
     raise TypeError('model_ors(): n_day_oprooms must be int!')
   elif n_day_oprooms <= 0:
@@ -127,8 +130,11 @@ def model_ors(n_day_oprooms,
   elif cleaning_time < 0:
     raise ValueError('model_ors(): cleaning_time must be positive!')
       
+  ###
+  ### Done typechecking
+  ### 
+
   n_classes = len(distribution_parameters)
-  time = 0
 
   # These lines initialize the queues to be empty.
   operating_rooms = []
@@ -137,7 +143,7 @@ def model_ors(n_day_oprooms,
   results = []
 
   # Now we start at time 0, and step through minute by minute.
-  for i in range(int(experiment_length)):
+  for time in range(int(experiment_length + converge_time)):
     # First we see how many patients have arrived this minute.
     n_patients = [numpy.random.poisson(x[0]) for x in
       distribution_parameters]
@@ -171,13 +177,13 @@ def model_ors(n_day_oprooms,
           distribution_parameters[j][1], distribution_parameters[j][2])))
 
         # Print the data about this patient.
-        if time > converge_time:
+        if queues[j][0] > converge_time:
           if queues[j][0] % day_to_min > night_length * hour_to_min:
             time_of_day = "day"
           else:
             time_of_day = "night"
-          results.append([j, queues[j][0], time_of_day, wait_time,
-            surgery_time])
+          results.append([j, int(queues[j][0] - converge_time), time_of_day, 
+            wait_time, surgery_time])
 
         # Because the patient has been put in an operating room, he can be
         # removed from the emergency queue.
@@ -192,7 +198,6 @@ def model_ors(n_day_oprooms,
 
     if time > converge_time:
       utilization_frac[len(operating_rooms)] += 1
-      time += 1
 
   utilization_results = []
   for i, elem in enumerate(utilization_frac):
@@ -230,5 +235,5 @@ if __name__ == '__main__':
 
   for elem in UTILIZATION_RESULTS:
     for item in elem:
-      print >> sys.stderr, item
-    print
+      print >> sys.stderr, item,
+    print >> sys.stderr
