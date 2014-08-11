@@ -37,17 +37,33 @@ def model_ors(n_day_oprooms,
       The number of hours per day that only night operating rooms are used.
     
     converge_time: float, optional
-      The number of seconds to discard at the beginning of the program to
+      The number of minutes to discard at the beginning of the program to
       let the program converge.
 
     experiment_length: number, optional
-      The number of seconds to run the experiment (in addition to the
+      The number of minutes to run the experiment (in addition to the
       seconds discarded after converge_time)
 
     cleaning_time: number, optional
       The number of minutes before and after a surgery that the operating
       room is unavailable because it is being prepared or cleaned.
       
+  Returns: (results, utilization_results)
+    results: (priority_class, in_time, time_of_day, wait_time, surgery_time)
+      priority_class: The class of the patient (e.g., emergent)
+
+      in_time: The time the patient entered the emergency room.
+
+      time_of_day: Whether the patient entered during the day or night
+
+      wait_time: How long the patient had to wait (in minutes)
+
+      surgery_time: How long the surgery took (in minutes)
+
+    utilization_results: list
+      Element i of this list is the fraction of times that i operating rooms
+      are occupied.
+    
   Important data structures in this program:
     emergent_queue: This is a list of patients in the emergency queue.  Each
       patient is recorded in the list by the time that the patient arrived.
