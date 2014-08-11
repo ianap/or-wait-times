@@ -242,7 +242,7 @@ if __name__ == '__main__':
                              (.001288052, 5.01655, .713405))
 
   RESULTS, UTILIZATION_RESULTS = model_ors(N_DAY_OPROOMS,
-    DISTRIBUTION_PARAMETERS, experiment_length=2e5)
+    DISTRIBUTION_PARAMETERS, experiment_length=2.628e6)
 
   for elem in RESULTS:
     for item in elem:
